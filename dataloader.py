@@ -21,14 +21,15 @@ def get_full_graph():
     return dataset[0]
 
 
-def get_dataloader(graph, validation=False):
+def get_val_dataloader(graph):
+    return get_dataloader(graph, 1, 2)
+
+
+def get_dataloader(graph, walk_length, context_size):
     row, col = graph.edge_index
     n = graph.num_nodes
     edge_adj_matrix = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
-    if validation:
-        sample_func = lambda x: sample(x, edge_adj_matrix, graph.x, 1, 2)
-    else:
-        sample_func = lambda x: sample(x, edge_adj_matrix, graph.x)
+    sample_func = lambda x: sample(x, edge_adj_matrix, graph.x, walk_length, context_size)
     return DataLoader(range(edge_adj_matrix.sparse_size(0)),
                           collate_fn=sample_func, batch_size=BATCH_SIZE)
 
@@ -127,14 +128,14 @@ def test_relabel_node():
 
 
 
-def test_randomwalk(graph, val=False):
+def test_randomwalk(graph, walk_length, context_size):
     edges = []
     for i in range(499):
         edges.append([i, i+1])
     for i in range(0, 498, 2):
         edges.append([i, i + 2])
     # graph = Data(x=torch.arange(500), edge_index=torch.tensor(edges).T)
-    dataloader = get_dataloader(graph, val)
+    dataloader = get_dataloader(graph, walk_length, context_size)
     sample_data = []
     for _ in range(10):
         data = next(iter(dataloader))
@@ -150,6 +151,6 @@ if __name__ == "__main__":
     print("train", train.edge_index)
     test_relabel_node()
     print("train")
-    test_randomwalk(train)
+    test_randomwalk(train, 20, 10)
     print("val")
-    test_randomwalk(val, True)
+    test_randomwalk(val, 1, 2)

@@ -4,8 +4,8 @@ import pytorch_lightning as pl
 
 if __name__ == "__main__":
     train, val, test = dataloader.get_datasets()
-    train_dataloader = dataloader.get_dataloader(train)
-    val_dataloader = dataloader.get_dataloader(val, True)
+    train_dataloader = dataloader.get_dataloader(train, 20, 10)
+    val_dataloader = dataloader.get_val_dataloader(val)
 
     input_dim = train.x.shape[1]
     hidden_dim = 128
