@@ -37,6 +37,7 @@ class Attri2Vec(LightningModule):
         super().__init__()
         self.embedding_dim = input_dim
         self.EPS = 1e-15
+        self.lr = lr
 
         if num_layers == 1:
             self.model = nn.ModuleList([nn.Linear(input_dim, output_dim)])
