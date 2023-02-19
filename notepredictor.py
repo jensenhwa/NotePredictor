@@ -8,6 +8,6 @@ import dataloader
 import attri2vec
 
 if __name__ == "__main__":
-    train, val, test = dataloader.get_datasets()
-
+    is_data, oos_data = dataloader.get_datasets()
+    train, val, test = is_data
     attri2vec.train(train, val, test)
