@@ -32,15 +32,9 @@ class Attri2Vec(LightningModule):
             hidden_dim: int,
             output_dim: int,
             num_layers: int,
-            walk_length: int,
-            context_size: int,
-            walks_per_node: int = 1,
     ):
         super().__init__()
         self.embedding_dim = input_dim
-        self.walk_length = walk_length - 1
-        self.context_size = context_size
-        self.walks_per_node = walks_per_node
         self.EPS = 1e-15
 
         if num_layers == 1:
@@ -79,7 +73,7 @@ class Attri2Vec(LightningModule):
         self.log("neg_loss", neg_loss, prog_bar=True)
         return pos_loss + neg_loss
 
-    def validation_step(self, batch):
+    def validation_step(self, batch, batch_idx):
         pos_rw, neg_rw = batch
 
         pos_rw = self.model(pos_rw)

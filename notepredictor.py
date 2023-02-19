@@ -1,6 +1,8 @@
+import pytorch_lightning as pl
+from pytorch_lightning.loggers import WandbLogger
+
 import dataloader
 from attri2vec import Attri2Vec
-import pytorch_lightning as pl
 
 if __name__ == "__main__":
     train, val, test = dataloader.get_datasets()
@@ -14,6 +16,13 @@ if __name__ == "__main__":
     walk_length = 10
     context_size = 5
 
-    attri2vec = Attri2Vec(input_dim, hidden_dim, output_dim, num_layers, walk_length, context_size)
-    trainer = pl.Trainer(max_epochs=50)
-    trainer.fit(attri2vec, train_dataloader)
+    wandb_logger = WandbLogger(project='note-predictor')
+    wandb_logger.experiment.config["hidden_dim"] = hidden_dim
+    wandb_logger.experiment.config["output_dim"] = output_dim
+    wandb_logger.experiment.config["num_layers"] = num_layers
+
+    attri2vec = Attri2Vec(input_dim, hidden_dim, output_dim, num_layers)
+    trainer = pl.Trainer(max_epochs=50, logger=wandb_logger)
+    trainer.fit(attri2vec,
+                train_dataloaders=train_dataloader,
+                val_dataloaders=val_dataloader)
