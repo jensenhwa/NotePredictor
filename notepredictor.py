@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 if __name__ == "__main__":
     is_data, oos_data = dataloader.get_datasets()
     train, val, test = is_data
+    train_dataloader = dataloader.get_dataloader(train)
 
     input_dim = is_data.x.shape[1]
     hidden_dim = 128

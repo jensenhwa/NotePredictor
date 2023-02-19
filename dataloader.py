@@ -27,7 +27,7 @@ def get_dataloader(graph):
     n = graph.num_nodes
     edge_adj_matrix = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
     return DataLoader(range(edge_adj_matrix.sparse_size(0)),
-                          collate_fn=lambda x: sample(x, edge_adj_matrix), batch_size=BATCH_SIZE)
+                          collate_fn=lambda x: sample(x, edge_adj_matrix, graph.x), batch_size=BATCH_SIZE)
 
 
 def pos_walk_sample(batch, edge_adj_mat, walks_per_node=10, walk_length=20, p=1, q=1):
@@ -58,9 +58,14 @@ def neg_walk_sample(batch, edge_adj_mat, walks_per_node=10, walk_length=20, num_
     return torch.cat(walks, dim=0)
 
 
-def sample(batch, edge_adj_mat):
+def sample(batch, edge_adj_mat, node_feats):
     batch = torch.tensor(batch)
-    return pos_walk_sample(batch, edge_adj_mat), neg_walk_sample(batch, edge_adj_mat)
+    pos_walks_idx = pos_walk_sample(batch, edge_adj_mat)
+    neg_walks_idx = neg_walk_sample(batch, edge_adj_mat)
+    d1, d2 = pos_walks_idx.shape
+    pos_walks_with_emb = torch.index_select(node_feats, 0, pos_walks_idx.flatten()).reshape((d1, d2, -1))
+    neg_walks_with_emb = torch.index_select(node_feats, 0, neg_walks_idx.flatten()).reshape((d1, d2, -1))
+    return pos_walks_with_emb, neg_walks_with_emb
 
 
 # Returns two tuples of data:
