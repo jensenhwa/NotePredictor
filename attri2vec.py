@@ -1,15 +1,9 @@
-import stellargraph as sg
-from stellargraph.data import UnsupervisedSampler
-from stellargraph.mapper import Attri2VecLinkGenerator, Attri2VecNodeGenerator
-from stellargraph.layer import Attri2Vec, link_classification
-
-from tensorflow import keras
-
+import torch
+from torch import nn
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
-from torch_geometric.utils import to_networkx
-import random
+from pytorch_lightning import LightningModule
 
 
 # Reference: https://stellargraph.readthedocs.io/en/stable/demos/link-prediction/attri2vec-link-prediction.html
@@ -30,8 +24,56 @@ import random
 #     subgraph_edgelist["label"] = "cites"  # set the edge type
 
 
-def train(train_graph, val_graph, test_graph):
-    nx_train = to_networkx(train_graph, node_attrs=['x'])
+class Attri2Vec(LightningModule):
+    def __init__(
+            self,
+            input_dim: int,
+            hidden_dim: int,
+            output_dim: int,
+            num_layers: int,
+            walk_length: int,
+            context_size: int,
+            walks_per_node: int = 1,
+    ):
+        super().__init__()
+        self.embedding_dim = input_dim
+        self.walk_length = walk_length - 1
+        self.context_size = context_size
+        self.walks_per_node = walks_per_node
+        self.EPS = 1e-15
 
-    G_train = sg.StellarGraph.from_networkx(nx_train, node_features='x')
-    print(G_train.info())
+        if num_layers == 1:
+            self.model = nn.ModuleList([nn.Linear(input_dim, output_dim)])
+        else:
+            self.model = nn.ModuleList([nn.Linear(input_dim, hidden_dim)])
+            for i in range(num_layers - 2):
+                self.model.append(nn.Linear(hidden_dim, hidden_dim))
+            self.model.append(nn.Linear(hidden_dim, output_dim))
+
+    def training_step(self, batch):
+        # batch should be the tuple (Tensor(num_walks, rw_len, node_emb_len), Tensor(num_walks, rw_len, node_emb_len))
+        # corresponding to the node embeddings of positive and negative random walk samples
+        pos_rw, neg_rw = batch
+
+        # Positive loss.
+        h_start = pos_rw[:, 0:1, :],
+        h_rest = pos_rw[:, 1:, :]  # .contiguous()
+
+        out = (h_start * h_rest).sum(dim=-1).view(-1)
+        pos_loss = -torch.log(torch.sigmoid(out) + self.EPS).mean()
+
+        # Negative loss.
+        h_start = neg_rw[:, 0:1, :],
+        h_rest = neg_rw[:, 1:, :]  # .contiguous()
+
+        out = (h_start * h_rest).sum(dim=-1).view(-1)
+        neg_loss = -torch.log(1 - torch.sigmoid(out) + self.EPS).mean()
+
+        return pos_loss + neg_loss
+
+    def validation_step(self, batch):
+        pos_rw, neg_rw = batch
+        # Get predictions across both positive and negative edges (can start with dot product and sigmoid)
+        accuracy = 0
+        self.log("accuracy", accuracy)
+
