@@ -101,3 +101,6 @@ class Attri2Vec(LightningModule):
 
         accuracy = self.accuracy(torch.cat((pos_out, neg_out)), labels)
         self.log("val_acc", accuracy, prog_bar=True)
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=0.01)
