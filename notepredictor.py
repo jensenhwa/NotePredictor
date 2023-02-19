@@ -22,8 +22,10 @@ sweep_configuration = {
 }
 
 
-def train(train_dataloader, val_dataloader):
+def train(train, val_dataloader):
     wandb.init()
+    print(wandb.config)
+    train_dataloader = dataloader.get_dataloader(train, wandb.config.walk_length, wandb.config.context_size)
     wandb_logger = WandbLogger(project='note-predictor')
     wandb_logger.experiment.config["hidden_dim"] = wandb.config.hidden_dim
     wandb_logger.experiment.config["output_dim"] = wandb.config.output_dim
@@ -37,11 +39,10 @@ def train(train_dataloader, val_dataloader):
                 train_dataloaders=train_dataloader,
                 val_dataloaders=val_dataloader)
 
+
 if __name__ == "__main__":
-    print(wandb.config)
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project='note-predictor')
     train, val, test = dataloader.get_datasets()
-    train_dataloader = dataloader.get_dataloader(train, wandb.config.walk_length, wandb.config.context_size)
     val_dataloader = dataloader.get_val_dataloader(val)
 
-    sweep_id = wandb.sweep(sweep=sweep_configuration, project='cs224w-finalproj')
-    wandb.agent(sweep_id, function=lambda: train(train_dataloader, val_dataloader), count=4)
+    wandb.agent(sweep_id, function=lambda: train(train, val_dataloader), count=4)
