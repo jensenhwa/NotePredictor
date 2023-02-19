@@ -32,6 +32,7 @@ class Attri2Vec(LightningModule):
             hidden_dim: int,
             output_dim: int,
             num_layers: int,
+            lr: float,
     ):
         super().__init__()
         self.embedding_dim = input_dim
@@ -97,4 +98,4 @@ class Attri2Vec(LightningModule):
         self.log("val_acc", accuracy, prog_bar=True)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=0.01)
+        return torch.optim.Adam(self.parameters(), lr=self.lr)

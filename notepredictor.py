@@ -3,26 +3,45 @@ from pytorch_lightning.loggers import WandbLogger
 
 import dataloader
 from attri2vec import Attri2Vec
+import wandb
 
-if __name__ == "__main__":
-    train, val, test = dataloader.get_datasets()
-    train_dataloader = dataloader.get_dataloader(train, 20, 10)
-    val_dataloader = dataloader.get_val_dataloader(val)
+sweep_configuration = {
+    'method': 'grid',
+    'name': 'sweep',
+    'metric': {'goal': 'maximize', 'name': 'val_acc'},
+    'parameters':
+    {
+        # 'epochs': {'values': [15]},
+        'lr': {'values': [1e-3, 1e-4, 1e-5]},
+        'num_layers': {'values': [2, 3, 4]},
+        'hidden_dim': {'values': [128, 256, 512]},
+        'output_dim': {'values': [128, 256, 512]},
+        'walk_length': {'values': [5, 10, 15]},
+        'context_size': {'values': [5, 10, 15]}
+     }
+}
 
-    input_dim = train.x.shape[1]
-    hidden_dim = 128
-    output_dim = 128
-    num_layers = 2
-    walk_length = 10
-    context_size = 5
 
+def train(train_dataloader, val_dataloader):
+    wandb.init()
     wandb_logger = WandbLogger(project='note-predictor')
-    wandb_logger.experiment.config["hidden_dim"] = hidden_dim
-    wandb_logger.experiment.config["output_dim"] = output_dim
-    wandb_logger.experiment.config["num_layers"] = num_layers
+    wandb_logger.experiment.config["hidden_dim"] = wandb.config.hidden_dim
+    wandb_logger.experiment.config["output_dim"] = wandb.config.output_dim
+    wandb_logger.experiment.config["num_layers"] = wandb.config.num_layers
 
-    attri2vec = Attri2Vec(input_dim, hidden_dim, output_dim, num_layers)
+    attri2vec = Attri2Vec(wandb.config.input_dim, wandb.config.hidden_dim, wandb.config.output_dim,
+                          wandb.config.num_layers, wandb.config.lr)
+    wandb.watch(attri2vec, log="all", log_freq=1)
     trainer = pl.Trainer(max_epochs=50, logger=wandb_logger)
     trainer.fit(attri2vec,
                 train_dataloaders=train_dataloader,
                 val_dataloaders=val_dataloader)
+
+if __name__ == "__main__":
+    print(wandb.config)
+    train, val, test = dataloader.get_datasets()
+    train_dataloader = dataloader.get_dataloader(train, wandb.config.walk_length, wandb.config.context_size)
+    val_dataloader = dataloader.get_val_dataloader(val)
+
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project='cs224w-finalproj')
+    wandb.agent(sweep_id, function=lambda: train(train_dataloader, val_dataloader), count=4)
