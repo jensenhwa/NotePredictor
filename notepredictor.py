@@ -12,12 +12,12 @@ sweep_configuration = {
     'parameters':
     {
         # 'epochs': {'values': [15]},
-        'lr': {'values': [1e-3]}, #, 1e-4, 1e-5]},
-        'num_layers': {'values': [2]}, #, 3, 4]},
-        'hidden_dim': {'values': [128]}, #, 256, 512]},
-        'output_dim': {'values': [128]}, #, 256, 512]},
-        'walk_length': {'values': [5]}, #, 10, 15]},
-        'context_size': {'values': [5]}, #, 10, 15]}
+        'lr': {'values': [1e-3, 1e-4, 1e-5]},
+        'num_layers': {'values': [2, 3, 4]},
+        'hidden_dim': {'values': [128, 256, 512]},
+        'output_dim': {'values': [128, 256, 512]},
+        'walk_length': {'values': [5, 10, 15]},
+        'context_size': {'values': [5, 10, 15]}
      }
 }
 
@@ -36,7 +36,7 @@ def train():
     attri2vec = Attri2Vec(train.x.shape[1], wandb.config.hidden_dim, wandb.config.output_dim,
                           wandb.config.num_layers, wandb.config.lr)
     wandb.watch(attri2vec, log="all", log_freq=1)
-    trainer = pl.Trainer(max_epochs=50, logger=wandb_logger)
+    trainer = pl.Trainer(max_epochs=6, logger=wandb_logger)
     trainer.fit(attri2vec,
                 train_dataloaders=train_dataloader,
                 val_dataloaders=val_dataloader)
