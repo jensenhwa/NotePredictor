@@ -50,4 +50,4 @@ def train():
 
 if __name__ == "__main__":
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='note-predictor')
-    wandb.agent(sweep_id, function=train, count=4)
+    wandb.agent(sweep_id, function=train)
