@@ -93,7 +93,8 @@ class Attri2Vec(LightningModule):
         out = (h_start * h_rest).sum(dim=-1).view(-1)
         neg_out = torch.sigmoid(out)
 
-        labels = torch.cat((torch.ones((len(pos_out))), torch.zeros((len(neg_out)))))
+        labels = torch.cat((torch.ones((len(pos_out)), dtype=torch.int, device=pos_out.device),
+                            torch.zeros((len(neg_out)), dtype=torch.int, device=pos_out.device)))
 
         accuracy = self.accuracy(torch.cat((pos_out, neg_out)), labels)
         self.log("val_acc", accuracy, prog_bar=True)

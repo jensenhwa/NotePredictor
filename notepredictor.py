@@ -1,4 +1,5 @@
 import pytorch_lightning as pl
+import torch.cuda
 from pytorch_lightning.loggers import WandbLogger
 
 import dataloader
@@ -36,7 +37,11 @@ def train():
     attri2vec = Attri2Vec(train.x.shape[1], wandb.config.hidden_dim, wandb.config.output_dim,
                           wandb.config.num_layers, wandb.config.lr)
     wandb.watch(attri2vec, log="all", log_freq=1)
-    trainer = pl.Trainer(max_epochs=6, logger=wandb_logger)
+    if torch.cuda.is_available():
+        trainer = pl.Trainer(max_epochs=50, accelerator="gpu", logger=wandb_logger)
+    else:
+        trainer = pl.Trainer(max_epochs=6, logger=wandb_logger)
+
     trainer.fit(attri2vec,
                 train_dataloaders=train_dataloader,
                 val_dataloaders=val_dataloader)
