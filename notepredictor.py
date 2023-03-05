@@ -36,6 +36,7 @@ def train():
     wandb_logger.experiment.config["output_dim"] = wandb.config.output_dim
     wandb_logger.experiment.config["num_layers"] = wandb.config.num_layers
 
+    # Learn node embeddings
     attri2vec = Attri2Vec(train.x.shape[1], wandb.config.hidden_dim, wandb.config.output_dim,
                           wandb.config.num_layers, wandb.config.lr)
     wandb.watch(attri2vec, log="all", log_freq=1)
@@ -48,10 +49,14 @@ def train():
                 train_dataloaders=train_dataloader,
                 val_dataloaders=val_dataloader)
 
+    # Link prediction on learned node embeddings
     embedded_test_graph = create_embedded_graph(graph, attri2vec.model)
     edge_model = EdgeLogisticRegression(wandb.config.output_dim, wandb.config.lr)
     in_sample_edge_dataloader, out_sample_edge_dataloader = get_edge_dataloader(embedded_test_graph)
-    trainer = pl.Trainer(max_epochs=1, logger=wandb_logger)
+    if torch.cuda.is_available():
+        trainer = pl.Trainer(max_epochs=50, accelerator="gpu", logger=wandb_logger)
+    else:
+        trainer = pl.Trainer(max_epochs=10, logger=wandb_logger)
     trainer.fit(edge_model, train_dataloaders=in_sample_edge_dataloader, val_dataloaders=out_sample_edge_dataloader)
 
     wandb.finish()
