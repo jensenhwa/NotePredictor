@@ -2,6 +2,7 @@ from ogb.nodeproppred import NodePropPredDataset
 from torch_geometric.data import Data
 from torch_geometric.utils import subgraph, to_undirected
 from torch_geometric.typing import SparseTensor
+import itertools
 
 import torch
 from torch.utils.data import DataLoader
@@ -72,9 +73,9 @@ def sample(batch, edge_adj_mat, node_feats, walk_length=20, context_size=10):
     return pos_walks_with_emb, neg_walks_with_emb
 
 
-# Returns two tuples of data:
-#  - in-sample data: train, validation, and test Data graph objects for in-sample training
-#  - out-of-sample data: node indices and features for out of sample testing
+# Returns train_dataset, val_dataset, (test_graph, full_graph)
+#  - in-sample data: train and validation Data graph objects for in-sample training
+#  - test data: all nodes but only train/val edges
 def get_datasets():
     dataset = NodePropPredDataset(name="ogbn-arxiv", root='dataset/')
     graph, label = dataset[0]
@@ -86,27 +87,52 @@ def get_datasets():
     # np.random.shuffle(test_idx)
     # in_sample_test_idx, out_of_sample_test_idx = torch.from_numpy(test_idx[OUT_OF_SAMPLE_SIZE:]), torch.from_numpy(test_idx[:OUT_OF_SAMPLE_SIZE])
 
-    # In-sample training/validation/testing datasets
+    # In-sample training/validation datasets
     # Note: confirmed that relabel nodes retains node feature order
     train_edges = subgraph(torch.from_numpy(train_idx), edge_idx, relabel_nodes=True)[0]
     train_graph = Data(x=node_feat[train_idx], edge_index=to_undirected(train_edges))
     # train_and_val_idx = np.sort(np.concatenate((train_idx, valid_idx)))
     val_edges = subgraph(torch.from_numpy(val_idx), edge_idx, relabel_nodes=True)[0]
     val_graph = Data(x=node_feat[val_idx], edge_index=to_undirected(val_edges))
-    # train_val_test_idx = np.sort(np.concatenate((train_and_val_idx, in_sample_test_idx)))
-    test_edges = subgraph(torch.from_numpy(test_idx), edge_idx, relabel_nodes=True)[0]
-    test_graph = Data(x=node_feat[test_idx], edge_index=to_undirected(test_edges))
 
-    return train_graph, val_graph, test_graph
+    # Creates test graph with all train/val edges and separate test nodes
+    train_and_val_idx = torch.from_numpy(np.sort(np.concatenate((train_idx, val_idx))))
+    train_and_val_edges = clean_edges(edge_idx, train_and_val_idx, True)
+    # train_val_test_idx = np.sort(np.concatenate((train_and_val_idx, test_idx)))
+    # test_edges = subgraph(torch.arange(graph["num_nodes"]), train_and_val_edges, relabel_nodes=False)[0]
+    test_graph = Data(x=node_feat, edge_index=to_undirected(train_and_val_edges))
+
+    return train_graph, val_graph, graph #(test_graph, graph, test_idx)
 
 
-# Deprecated
-def clean_dataset(full_node_feat, full_edge_idx, split_idxs, in_sample):
-    split_node_feat = full_node_feat[split_idxs]
+# Returns all edges where either one (not in_sample) or both (in_sample) nodes are within the split idx
+def clean_edges(full_edge_idx, split_idxs, in_sample):
     edge_elem_mask = torch.isin(full_edge_idx, split_idxs)
     edge_mask = torch.sum(edge_elem_mask, axis=0) > in_sample
     split_edge_idxs = full_edge_idx[:, edge_mask]
-    return Data(x=split_node_feat, edge_index=split_edge_idxs)
+    return split_edge_idxs
+
+
+# Returns a tuple of edges and edge labels where 1 is existing and 0 is not in graph
+# TODO: do we want to shuffle?
+def get_pos_neg_edges(graph, in_sample):
+    dataset = NodePropPredDataset(name="ogbn-arxiv", root='dataset/')
+    split_idx = dataset.get_idx_split()
+    train_idx, val_idx, test_idx = split_idx["train"], split_idx["valid"], split_idx["test"]
+
+    if in_sample:
+        idxs = torch.from_numpy(np.concatenate((train_idx, val_idx)))
+        all_edges = torch.combinations(idxs)
+    else:
+        idxs = torch.from_numpy(test_idx)
+        all_edges = torch.combinations(torch.arange(graph.num_nodes))
+
+    pos_out_sample_edges = clean_edges(graph.edge_index, idxs, in_sample)
+
+    # TODO: check dimensions
+    labels = torch.zeros(all_edges.shape[0])
+    labels[all_edges == pos_out_sample_edges] = 1
+    return all_edges, labels
 
 
 def test_relabel_node():
@@ -145,7 +171,7 @@ def test_randomwalk(graph, walk_length, context_size):
 
 
 if __name__ == "__main__":
-    train, val, test = get_datasets()
+    train, val, graph = get_datasets()
     print("train", train)
     print("train", train["x"])
     print("train", train.edge_index)
@@ -154,3 +180,4 @@ if __name__ == "__main__":
     test_randomwalk(train, 20, 10)
     print("val")
     test_randomwalk(val, 1, 2)
+

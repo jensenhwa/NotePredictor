@@ -4,6 +4,8 @@ from pytorch_lightning.loggers import WandbLogger
 
 import dataloader
 from attri2vec import Attri2Vec
+from linkprediction import create_embedded_graph, EdgeLogisticRegression
+from edge_dataloader import get_edge_dataloader
 import wandb
 
 sweep_configuration = {
@@ -26,7 +28,7 @@ sweep_configuration = {
 def train():
     wandb.init()
     print(wandb.config)
-    train, val, test = dataloader.get_datasets()
+    train, val, graph = dataloader.get_datasets()
     val_dataloader = dataloader.get_val_dataloader(val)
     train_dataloader = dataloader.get_dataloader(train, wandb.config.walk_length, wandb.config.context_size)
     wandb_logger = WandbLogger(project='note-predictor')
@@ -45,6 +47,13 @@ def train():
     trainer.fit(attri2vec,
                 train_dataloaders=train_dataloader,
                 val_dataloaders=val_dataloader)
+
+    embedded_test_graph = create_embedded_graph(graph, attri2vec.model)
+    edge_model = EdgeLogisticRegression(wandb.config.output_dim, wandb.config.lr)
+    in_sample_edge_dataloader, out_sample_edge_dataloader = get_edge_dataloader(embedded_test_graph)
+    trainer = pl.Trainer(max_epochs=1, logger=wandb_logger)
+    trainer.fit(edge_model, train_dataloaders=in_sample_edge_dataloader, val_dataloaders=out_sample_edge_dataloader)
+
     wandb.finish()
 
 
