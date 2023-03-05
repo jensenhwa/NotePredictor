@@ -25,6 +25,9 @@ class EdgeLogisticRegression(LightningModule):
         out = torch.sigmoid(self.linear(x)).squeeze()
         loss = F.binary_cross_entropy(out, y.to(dtype=torch.float32))
         self.log("link_loss", loss, prog_bar=True)
+        pred = out > 0.5
+        accuracy = torch.count_nonzero(pred == y) / y.shape[0]
+        self.log("train_acc", accuracy, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
