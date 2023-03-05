@@ -1,3 +1,9 @@
+import pickle
+import sqlite3
+from pathlib import Path
+
+# import requests
+# import zstandard
 from ogb.nodeproppred import NodePropPredDataset
 from torch_geometric.data import Data
 from torch_geometric.utils import subgraph, to_undirected
@@ -103,6 +109,24 @@ def get_datasets():
     test_graph = Data(x=node_feat, edge_index=to_undirected(train_and_val_edges))
 
     return train_graph, val_graph, graph #(test_graph, graph, test_idx)
+
+
+def get_title(id) -> str:
+    url = "https://zenodo.org/record/6511057/files/Papers.txt.zst?download=1"
+    data_filepath = Path("dataset") / "papers.txt"
+    db_filepath = Path("dataset") / "papers.db"
+    if not db_filepath.exists():
+        raise FileNotFoundError("Papers database not found")
+        # if not data_filepath.exists():
+        #     with requests.get(url, stream=True) as r:
+        #         r.raise_for_status()
+        #         with open(data_filepath, "wb") as f:
+        #             dctx = zstandard.ZstdDecompressor()
+        #             dctx.copy_stream(r.raw, f)
+    con = sqlite3.connect(db_filepath)
+    cur = con.cursor()
+    res = cur.execute("SELECT PaperTitle from papers WHERE PaperId = ? LIMIT 1", (id,))
+    return res.fetchone()[0]
 
 
 # Returns all edges where either one (not in_sample) or both (in_sample) nodes are within the split idx

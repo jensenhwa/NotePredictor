@@ -42,9 +42,9 @@ class Attri2Vec(LightningModule):
         if num_layers == 1:
             self.model = nn.ModuleList([nn.Linear(input_dim, output_dim)])
         else:
-            self.model = nn.ModuleList([nn.Linear(input_dim, hidden_dim)])
+            self.model = nn.ModuleList([nn.Linear(input_dim, hidden_dim), nn.ReLU()])
             for i in range(num_layers - 2):
-                self.model.append(nn.Linear(hidden_dim, hidden_dim))
+                self.model.extend([nn.Linear(hidden_dim, hidden_dim), nn.ReLU()])
             self.model.append(nn.Linear(hidden_dim, output_dim))
         self.model = nn.Sequential(*self.model)
 
