@@ -4,6 +4,7 @@ from pytorch_lightning.loggers import WandbLogger
 
 import dataloader
 from attri2vec import Attri2Vec
+from gnn import GNN
 from linkprediction import create_embedded_graph, EdgeLogisticRegression
 from edge_dataloader import get_edge_dataloader
 import wandb
@@ -20,7 +21,8 @@ sweep_configuration = {
         'hidden_dim': {'values': [128, 256, 512]},
         'output_dim': {'values': [128, 256, 512]},
         'walk_length': {'values': [5, 10, 15]},
-        'context_size': {'values': [5, 10, 15]}
+        'context_size': {'values': [5, 10, 15]},
+        'model_type': {'values': ['gnn']}
      }
 }
 
@@ -29,28 +31,37 @@ def train():
     wandb.init()
     print(wandb.config)
     train, val, graph = dataloader.get_datasets()
-    val_dataloader = dataloader.get_val_dataloader(val)
-    train_dataloader = dataloader.get_dataloader(train, wandb.config.walk_length, wandb.config.context_size)
+    val_dataloader = dataloader.get_val_dataloader(val, wandb.config.model_type)
+    train_dataloader = dataloader.get_dataloader(train,
+                                                 wandb.config.walk_length,
+                                                 wandb.config.context_size,
+                                                 wandb.config.model_type)
     wandb_logger = WandbLogger(project='note-predictor')
     wandb_logger.experiment.config["hidden_dim"] = wandb.config.hidden_dim
     wandb_logger.experiment.config["output_dim"] = wandb.config.output_dim
     wandb_logger.experiment.config["num_layers"] = wandb.config.num_layers
 
     # Learn node embeddings
-    attri2vec = Attri2Vec(train.x.shape[1], wandb.config.hidden_dim, wandb.config.output_dim,
+    if wandb.config.model_type == 'attri2vec':
+        node_model = Attri2Vec(train.x.shape[1], wandb.config.hidden_dim, wandb.config.output_dim,
                           wandb.config.num_layers, wandb.config.lr)
-    wandb.watch(attri2vec, log="all", log_freq=1)
+    elif wandb.config.model_type == 'gnn':
+        node_model = GNN(train.x.shape[1], wandb.config.hidden_dim, wandb.config.output_dim,
+                          wandb.config.num_layers, wandb.config.lr, train, val)
+    else:
+        raise ValueError('invalid model_type in wandb config')
+    wandb.watch(node_model, log="all", log_freq=1)
     if torch.cuda.is_available():
         trainer = pl.Trainer(max_epochs=50, accelerator="gpu", logger=wandb_logger)
     else:
         trainer = pl.Trainer(max_epochs=6, logger=wandb_logger)
 
-    trainer.fit(attri2vec,
+    trainer.fit(node_model,
                 train_dataloaders=train_dataloader,
                 val_dataloaders=val_dataloader)
 
     # Link prediction on learned node embeddings
-    embedded_test_graph = create_embedded_graph(graph, attri2vec.model)
+    embedded_test_graph = create_embedded_graph(graph, node_model.model)
     edge_model = EdgeLogisticRegression(wandb.config.output_dim, wandb.config.lr)
     in_sample_edge_dataloader, out_sample_edge_dataloader = get_edge_dataloader(embedded_test_graph)
     if torch.cuda.is_available():

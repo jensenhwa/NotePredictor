@@ -4,6 +4,8 @@ import torch.nn.functional as F
 from pytorch_lightning import LightningModule
 from torch import nn
 from torch_geometric.nn import GCNConv
+from torch_geometric.data import Data
+from torch_sparse import SparseTensor
 from torchmetrics import Accuracy
 
 
@@ -18,6 +20,8 @@ class GNN(LightningModule):
             output_dim: int,
             num_layers: int,
             lr: float,
+            train: Data,
+            val: Data,
     ):
         super().__init__()
         self.lr = lr
@@ -36,20 +40,29 @@ class GNN(LightningModule):
 
         self.accuracy = Accuracy(task='binary')
 
+        row, col = train.edge_index
+        n = train.num_nodes
+        self.train_adj = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
+        self.train_feats = train.x
+        row, col = val.edge_index
+        n = train.num_nodes
+        self.val_adj = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
+        self.val_feats = val.x
+
     def training_step(self, batch):
         # each batch should be:
         # (positive rw node indices,  negative rw node indices,  node embeddings,    adjacency matrix)
         # (Tensor(num_walks, rw_len), Tensor(num_walks, rw_len), Tensor(num_nodes, node_emb_len), adj)
 
         # Node embeddings can just correspond to the nodes in the random walks, or the entire training set
-        pos_rw, neg_rw, x, adj_t = batch
+        pos_rw, neg_rw = batch
 
-        out = x
+        out = self.train_feats
         for conv, bn in zip(self.convs[:-1], self.bns):
-            out = conv(out, adj_t)
+            out = conv(out, self.train_adj)
             out = bn(out)
             out = F.relu(out)
-        out = self.convs[-1](out, adj_t)
+        out = self.convs[-1](out, self.train_adj)
 
         embedding = nn.Embedding.from_pretrained(out, freeze=True)
 
@@ -72,13 +85,13 @@ class GNN(LightningModule):
 
 
     def validation_step(self, batch, batch_idx):
-        pos_rw, neg_rw, x, adj_t = batch
-        out = x
+        pos_rw, neg_rw = batch
+        out = self.val_feats
         for conv, bn in zip(self.convs[:-1], self.bns):
-            out = conv(out, adj_t)
+            out = conv(out, self.val_adj)
             out = bn(out)
             out = F.relu(out)
-        out = self.convs[-1](out, adj_t)
+        out = self.convs[-1](out, self.val_adj)
 
         embedding = nn.Embedding.from_pretrained(out, freeze=True)
 

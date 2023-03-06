@@ -28,15 +28,20 @@ def get_full_graph():
     return dataset[0]
 
 
-def get_val_dataloader(graph):
-    return get_dataloader(graph, 1, 2)
+def get_val_dataloader(graph, model_type):
+    return get_dataloader(graph, 1, 2, model_type)
 
 
-def get_dataloader(graph, walk_length, context_size):
+def get_dataloader(graph, walk_length, context_size, model_type):
     row, col = graph.edge_index
     n = graph.num_nodes
     edge_adj_matrix = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
-    sample_func = lambda x: sample(x, edge_adj_matrix, graph.x, walk_length, context_size)
+    if model_type == 'attri2vec':
+        sample_func = lambda x: sample(x, edge_adj_matrix, graph.x, walk_length, context_size)
+    elif model_type == 'gnn':
+        sample_func = lambda x: sample_idxs(x, edge_adj_matrix, graph.x, walk_length, context_size)
+    else:
+        raise ValueError('invalid model_type')
     return DataLoader(range(edge_adj_matrix.sparse_size(0)),
                           collate_fn=sample_func, batch_size=BATCH_SIZE)
 
@@ -77,6 +82,13 @@ def sample(batch, edge_adj_mat, node_feats, walk_length=20, context_size=10):
     pos_walks_with_emb = torch.index_select(node_feats, 0, pos_walks_idx.flatten()).reshape((d1, d2, -1))
     neg_walks_with_emb = torch.index_select(node_feats, 0, neg_walks_idx.flatten()).reshape((d1, d2, -1))
     return pos_walks_with_emb, neg_walks_with_emb
+
+
+def sample_idxs(batch, edge_adj_mat, node_feats, walk_length=20, context_size=10):
+    batch = torch.tensor(batch)
+    pos_walks_idx = pos_walk_sample(batch, edge_adj_mat, walk_length, context_size)
+    neg_walks_idx = neg_walk_sample(batch, edge_adj_mat, walk_length, context_size)
+    return pos_walks_idx, neg_walks_idx
 
 
 # Returns train_dataset, val_dataset, (test_graph, full_graph)
