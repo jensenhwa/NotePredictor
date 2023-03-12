@@ -74,20 +74,18 @@ class GNN(LightningModule):
             out = conv(out, self.train_adj)
             out = bn(out)
             out = F.relu(out)
-        out = self.convs[-1](out, self.train_adj)
-
-        embedding = nn.Embedding.from_pretrained(out, freeze=False)
+        embs = self.convs[-1](out, self.train_adj)
 
         # Positive loss.
-        h_start = embedding(pos_rw[:, :1])
-        h_rest = embedding(pos_rw[:, 1:])
+        h_start = embs[pos_rw[:, 0]].unsqueeze(1)
+        h_rest = embs[pos_rw[:, 1:].squeeze()].reshape(pos_rw[:, 1:].shape + (-1,))
 
         out = (h_start * h_rest).sum(dim=-1).view(-1)
         pos_loss = -torch.log(torch.sigmoid(out) + self.EPS).mean()
 
         # Negative loss.
-        h_start = embedding(neg_rw[:, :1])
-        h_rest = embedding(neg_rw[:, 1:])  # .contiguous()
+        h_start = embs[neg_rw[:, 0]].unsqueeze(1)
+        h_rest = embs[neg_rw[:, 1:].squeeze()].reshape(neg_rw[:, 1:].shape + (-1,))
 
         out = (h_start * h_rest).sum(dim=-1).view(-1)
         neg_loss = -torch.log(1 - torch.sigmoid(out) + self.EPS).mean()
@@ -103,19 +101,17 @@ class GNN(LightningModule):
             out = conv(out, self.val_adj)
             out = bn(out)
             out = F.relu(out)
-        out = self.convs[-1](out, self.val_adj)
+        embs = self.convs[-1](out, self.val_adj)
 
-        embedding = nn.Embedding.from_pretrained(out, freeze=True)
-
-        h_start = embedding(pos_rw[:, :1])
-        h_rest = embedding(pos_rw[:, 1:])
+        h_start = embs[pos_rw[:, 0]].unsqueeze(1)
+        h_rest = embs[pos_rw[:, 1:].flatten()].reshape(pos_rw[:, 1:].shape + (-1,))
 
         out = (h_start * h_rest).sum(dim=-1).view(-1)
         assert (len(out) == pos_rw.shape[0] * (pos_rw.shape[1] - 1))
         pos_out = torch.sigmoid(out)
 
-        h_start = embedding(neg_rw[:, :1])
-        h_rest = embedding(neg_rw[:, 1:])
+        h_start = embs[neg_rw[:, 0]].unsqueeze(1)
+        h_rest = embs[neg_rw[:, 1:].flatten()].reshape(neg_rw[:, 1:].shape + (-1,))
         out = (h_start * h_rest).sum(dim=-1).view(-1)
         neg_out = torch.sigmoid(out)
 
