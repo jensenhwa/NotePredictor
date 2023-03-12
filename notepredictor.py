@@ -19,6 +19,7 @@ sweep_configuration = {
     'parameters':
     {
         'lr': {'values': [1e-3, 1e-4, 1e-5]},
+        'mlp_lr': {'values': [1e-2]},
         'num_layers': {'values': [2, 3, 4]},
         'hidden_dim': {'values': [128, 256, 512]},
         'output_dim': {'values': [128, 256, 512]},
@@ -76,7 +77,7 @@ def train():
             link_model = node_model.model
         elif wandb.config.model_type == 'gnn':
             mlp_model = train_gnn_mlp(node_model, wandb_logger, train.x.shape[1], wandb.config.hidden_dim, wandb.config.output_dim,
-                              wandb.config.num_layers, wandb.config.lr, train, val)
+                              wandb.config.num_layers, wandb.config.mlp_lr, train, val)
             link_model = mlp_model.model
         else:
             raise ValueError('invalid model_type in wandb config')

@@ -56,6 +56,7 @@ class MLP(LightningModule):
         n = self.val.num_nodes
         self.val_adj = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
         self.val_feats = self.val.x.to(device)
+        self.gnn = self.gnn.to(device)
         self.train_y = get_gnn_emb(self.gnn, self.train_feats, self.train_adj)
         self.val_y = get_gnn_emb(self.gnn, self.val_feats, self.val_adj)
 
