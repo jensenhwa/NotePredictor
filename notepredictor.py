@@ -7,6 +7,7 @@ from attri2vec import Attri2Vec
 from gnn import GNN
 from linkprediction import create_embedded_graph, EdgeLogisticRegression
 from edge_dataloader import get_edge_dataloader
+from gnn_mlp import train_gnn_mlp
 import wandb
 import traceback
 import sys
@@ -70,9 +71,20 @@ def train():
                     train_dataloaders=train_dataloader,
                     val_dataloaders=val_dataloader)
 
-        if hasattr(node_model, 'model'):
+        # Get node embedding model
+        if wandb.config.model_type == 'attri2vec':
+            link_model = node_model.model
+        elif wandb.config.model_type == 'gnn':
+            mlp_model = train_gnn_mlp(node_model, wandb_logger, train.x.shape[1], wandb.config.hidden_dim, wandb.config.output_dim,
+                              wandb.config.num_layers, wandb.config.lr, train, val)
+            link_model = mlp_model.model
+        else:
+            raise ValueError('invalid model_type in wandb config')
+
+
+        if link_model:
             # Link prediction on learned node embeddings
-            embedded_test_graph = create_embedded_graph(graph, node_model.model)
+            embedded_test_graph = create_embedded_graph(graph, link_model)
             edge_model = EdgeLogisticRegression(wandb.config.output_dim, wandb.config.lr)
             in_sample_edge_dataloader, out_sample_edge_dataloader = get_edge_dataloader(embedded_test_graph)
             if torch.cuda.is_available():
