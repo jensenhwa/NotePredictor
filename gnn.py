@@ -48,6 +48,7 @@ class GNN(LightningModule):
         n = train.num_nodes
         self.val_adj = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
         self.val_feats = val.x
+        self.EPS = 0.05
 
     def training_step(self, batch):
         # each batch should be:
@@ -67,15 +68,15 @@ class GNN(LightningModule):
         embedding = nn.Embedding.from_pretrained(out, freeze=True)
 
         # Positive loss.
-        h_start = embedding(pos_rw[:, 0:1, :])
-        h_rest = embedding(pos_rw[:, 1:, :])
+        h_start = embedding(pos_rw[:, :1])
+        h_rest = embedding(pos_rw[:, 1:])
 
         out = (h_start * h_rest).sum(dim=-1).view(-1)
         pos_loss = -torch.log(torch.sigmoid(out) + self.EPS).mean()
 
         # Negative loss.
-        h_start = embedding(neg_rw[:, 0:1, :])
-        h_rest = embedding(neg_rw[:, 1:, :])  # .contiguous()
+        h_start = embedding(neg_rw[:, :1])
+        h_rest = embedding(neg_rw[:, 1:])  # .contiguous()
 
         out = (h_start * h_rest).sum(dim=-1).view(-1)
         neg_loss = -torch.log(1 - torch.sigmoid(out) + self.EPS).mean()
@@ -95,15 +96,15 @@ class GNN(LightningModule):
 
         embedding = nn.Embedding.from_pretrained(out, freeze=True)
 
-        h_start = embedding(pos_rw[:, 0:1, :])
-        h_rest = embedding(pos_rw[:, 1:, :])
+        h_start = embedding(pos_rw[:, :1])
+        h_rest = embedding(pos_rw[:, 1:])
 
         out = (h_start * h_rest).sum(dim=-1).view(-1)
         assert (len(out) == pos_rw.shape[0] * (pos_rw.shape[1] - 1))
         pos_out = torch.sigmoid(out)
 
-        h_start = embedding(neg_rw[:, 0:1, :])
-        h_rest = embedding(neg_rw[:, 1:, :])
+        h_start = embedding(neg_rw[:, :1])
+        h_rest = embedding(neg_rw[:, 1:])
         out = (h_start * h_rest).sum(dim=-1).view(-1)
         neg_out = torch.sigmoid(out)
 
