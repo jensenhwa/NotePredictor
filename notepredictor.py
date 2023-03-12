@@ -88,7 +88,7 @@ def train():
             edge_model = EdgeLogisticRegression(wandb.config.output_dim, wandb.config.lr)
             in_sample_edge_dataloader, out_sample_edge_dataloader = get_edge_dataloader(embedded_test_graph)
             if torch.cuda.is_available():
-                trainer = pl.Trainer(max_epochs=5, accelerator="gpu", logger=wandb_logger)
+                trainer = pl.Trainer(max_epochs=50, accelerator="gpu", logger=wandb_logger)
             else:
                 trainer = pl.Trainer(max_epochs=10, logger=wandb_logger)
             trainer.fit(edge_model, train_dataloaders=in_sample_edge_dataloader, val_dataloaders=out_sample_edge_dataloader)
