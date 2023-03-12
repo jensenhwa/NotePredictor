@@ -27,7 +27,7 @@ class EdgeLogisticRegression(LightningModule):
         self.log("link_loss", loss, prog_bar=True)
         pred = out > 0.5
         accuracy = torch.count_nonzero(pred == y) / y.shape[0]
-        self.log("train_acc", accuracy, prog_bar=True)
+        self.log("link_train_acc", accuracy, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -35,7 +35,7 @@ class EdgeLogisticRegression(LightningModule):
         out = torch.sigmoid(self.linear(x)).squeeze()
         pred = out > 0.5
         accuracy = torch.count_nonzero(pred == y) / y.shape[0]
-        self.log("val_acc", accuracy, prog_bar=True)
+        self.log("link_val_acc", accuracy, prog_bar=True)
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
