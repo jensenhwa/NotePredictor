@@ -68,11 +68,13 @@ class MLP(LightningModule):
     def training_step(self, batch, batch_idx):
         out = self.model(self.train_feats)
         loss = F.mse_loss(out, self.train_y)
+        self.log("gnn_mlp_train_loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         out = self.model(self.val_feats)
         loss = F.mse_loss(out, self.val_y)
+        self.log("gnn_mlp_val_loss", loss, prog_bar=True)
         return loss
 
     def configure_optimizers(self):
