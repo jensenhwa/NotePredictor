@@ -40,15 +40,26 @@ class GNN(LightningModule):
 
         self.accuracy = Accuracy(task='binary')
 
-        row, col = train.edge_index
-        n = train.num_nodes
-        self.train_adj = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
-        self.train_feats = train.x
-        row, col = val.edge_index
-        n = train.num_nodes
-        self.val_adj = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
-        self.val_feats = val.x
+        self.train = train
+        self.val = val
+        self.train_adj = None
+        self.train_feats = None
+        self.val_adj = None
+        self.val_feats = None
         self.EPS = 0.05
+
+    def prepare_data(self) -> None:
+        # https://github.com/Lightning-AI/lightning/issues/13108#issuecomment-1379084281
+        device = self.trainer.strategy.root_device
+        row, col = self.train.edge_index.to(device)
+        n = self.train.num_nodes
+        self.train_adj = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
+        self.train_feats = self.train.x.to(device)
+
+        row, col = self.val.edge_index.to(device)
+        n = self.val.num_nodes
+        self.val_adj = SparseTensor(row=row, col=col, sparse_sizes=(n, n))
+        self.val_feats = self.val.x.to(device)
 
     def training_step(self, batch):
         # each batch should be:
@@ -65,7 +76,7 @@ class GNN(LightningModule):
             out = F.relu(out)
         out = self.convs[-1](out, self.train_adj)
 
-        embedding = nn.Embedding.from_pretrained(out, freeze=True)
+        embedding = nn.Embedding.from_pretrained(out, freeze=False)
 
         # Positive loss.
         h_start = embedding(pos_rw[:, :1])
