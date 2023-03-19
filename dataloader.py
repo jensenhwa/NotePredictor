@@ -22,6 +22,11 @@ OUT_OF_SAMPLE_SIZE = 100
 BATCH_SIZE = 128
 
 
+def convert_graph_to_data(graph):
+    node_feat, edge_idx = torch.from_numpy(graph["node_feat"]), torch.from_numpy(graph["edge_index"])
+    return Data(x=node_feat, edge_index=to_undirected(edge_idx))
+
+
 # Gets full dataset graph with all nodes and edges (for final out-of-sample testing)
 def get_full_graph():
     dataset = NodePropPredDataset(name="ogbn-arxiv", root='dataset/')
